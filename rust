@@ -1,0 +1,69 @@
+#![no_std] // Standard kütüphaneleri kullanmıyoruz, MultiversX akıllı sözleşmeleri için gereklidir
+
+use multiversx_sdk::contract::{contract, view, call}; // MultiversX SDK'sından contract, view ve call makrolarını dahil ediyoruz
+use multiversx_sdk::types::{Address, U256}; // MultiversX SDK'sındaki Address (adresler) ve U256 (büyük sayılar) tiplerini dahil ediyoruz
+
+// Akıllı sözleşme yapısını tanımlıyoruz
+#[contract]
+pub struct StakingContract {
+    // Staked tokens (stake edilmiş tokenlar) için adreslere göre miktarları tutuyor
+    staked_amount: mapping(Address => U256),
+    
+    // Kullanıcıların stake etme zamanlarını tutuyor
+    staking_time: mapping(Address => u64),
+    
+    // Yıllık faiz oranı (APY) - stake ödüllerini hesaplamak için kullanılacak
+    apy: U256,
+}
+
+// Akıllı sözleşme işlevlerini tanımlıyoruz
+impl StakingContract {
+    // Stake işlevi: Kullanıcıların stake etmek için çağıracağı fonksiyon
+    #[call]
+    pub fn stake(&mut self, sender: Address, amount: U256) {
+        let current_time = self.get_block_time(); // Şu anki zaman (block zamanı) alınıyor
+        
+        // Kullanıcının stake miktarını kaydediyoruz
+        self.staked_amount.insert(sender, amount);
+        
+        // Kullanıcının stake etmeye başladığı zamanı kaydediyoruz
+        self.staking_time.insert(sender, current_time);
+    }
+
+    // Unstake işlevi: Kullanıcıların stake ettikleri tokenları geri alması için kullanılan fonksiyon
+    #[call]
+    pub fn unstake(&mut self, sender: Address) -> U256 {
+        let staked = self.staked_amount.get(sender); // Kullanıcının stake miktarını alıyoruz
+        
+        // Kullanıcının stake miktarını kaldırıyoruz (unstake)
+        self.staked_amount.remove(sender);
+        
+        // Unstake işlemi tamamlandıktan sonra geri döndürülen miktar
+        staked
+    }
+
+    // Ödül hesaplama işlevi: Kullanıcının stake ettiği token üzerinden ödülleri hesaplamak için kullanılır
+    #[view]
+    pub fn calculate_rewards(&self, sender: Address) -> U256 {
+        let staked = self.staked_amount.get(sender); // Kullanıcının stake ettiği miktar alınır
+        let staking_time = self.staking_time.get(sender); // Kullanıcının stake etmeye başladığı zaman alınır
+        let current_time = self.get_block_time(); // Şu anki zaman alınır
+        
+        // Stake süresi ve APY kullanılarak ödül hesaplanır
+        let duration = current_time - staking_time; // Stake süresi hesaplanır
+        // Basit ödül hesaplama: stake miktarı * APY * süre / 365
+        staked * self.apy * duration / 365
+    }
+    
+    // Akıllı sözleşme üzerinde geçerli olan APY'yi döndüren işlev
+    #[view]
+    pub fn get_apy(&self) -> U256 {
+        self.apy // Geçerli APY değerini döndürüyoruz
+    }
+
+    // Blok zamanını almak için kullanılan yardımcı fonksiyon
+    fn get_block_time(&self) -> u64 {
+        // Burada blok zamanını alacak kodu yazmanız gerekiyor
+        0 // Şu an için sabit bir değer dönüyor (geliştirilecek)
+    }
+}
